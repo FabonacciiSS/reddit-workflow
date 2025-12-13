@@ -1,0 +1,538 @@
+{
+  "name": "Reddit - High Score Rewrite Broadcast v2",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "3fa04f07-6370-44d8-81f5-3a35a22aaba5",
+      "name": "When clicking 'Test workflow'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -16,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 24
+            }
+          ]
+        }
+      },
+      "id": "8e74fe50-dfdd-4d8d-bc28-82fc63141332",
+      "name": "Daily 24h",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        -16,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "feishu_app_token",
+              "name": "FEISHU_BITABLE_APP_TOKEN",
+              "value": "={{ $env.FEISHU_BITABLE_REDDIT_APP_TOKEN }}",
+              "type": "string"
+            },
+            {
+              "id": "feishu_table_id",
+              "name": "FEISHU_BITABLE_TABLE_ID",
+              "value": "={{ $env.FEISHU_BITABLE_REDDIT_TABLE_ID }}",
+              "type": "string"
+            },
+            {
+              "id": "feishu_app_id",
+              "name": "FEISHU_APP_ID",
+              "value": "={{ $env.FEISHU_APP_ID }}",
+              "type": "string"
+            },
+            {
+              "id": "feishu_app_secret",
+              "name": "FEISHU_APP_SECRET",
+              "value": "={{ $env.FEISHU_APP_SECRET }}",
+              "type": "string"
+            },
+            {
+              "id": "deepseek_model",
+              "name": "DEEPSEEK_MODEL",
+              "value": "={{ $env.DEEPSEEK_MODEL || \"deepseek-chat\" }}",
+              "type": "string"
+            },
+            {
+              "id": "webhook_url",
+              "name": "FEISHU_WEBHOOK_URL",
+              "value": "={{ $env.FEISHU_WEBHOOK_URL }}",
+              "type": "string"
+            },
+            {
+              "id": "4dbf86d9-b3e0-4891-91d1-668cb1432df2",
+              "name": "FEISHU_BITABLE_INSIGHT_APP_TOKEN",
+              "value": "={{ $env.FEISHU_BITABLE_REDDIT2_APP_TOKEN }}",
+              "type": "string"
+            },
+            {
+              "id": "321c092c-8a23-4eb1-968d-e0bc3779c4d8",
+              "name": "FEISHU_BITABLE_INSIGHT_TABLE_ID",
+              "value": "={{ $env.FEISHU_BITABLE_REDDIT2_TABLE_ID }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f1328e76-255f-469a-b351-eff6c1e9c73f",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        208,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ ({ app_id: $node[\"Config\"].json.FEISHU_APP_ID, app_secret: $node[\"Config\"].json.FEISHU_APP_SECRET }) }}",
+        "options": {}
+      },
+      "id": "ebd365fb-1563-4d89-9c34-035bac5128b9",
+      "name": "Get Feishu Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        400,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const keywords = ['n8n', 'workflow','workflows','automation'];\n\nconst normalize = (value) => {\n  if (value === undefined || value === null) return '';\n  if (typeof value === 'string') return value;\n  if (Array.isArray(value)) {\n    return value.map(normalize).filter(Boolean).join(' ');\n  }\n  if (typeof value === 'object') {\n    const text = value.text || value.value || value.display;\n    if (text) return String(text);\n    return Object.values(value).map(normalize).filter(Boolean).join(' ');\n  }\n  return String(value);\n};\n\nconst matchesKeyword = (field) => {\n  const text = normalize(field).toLowerCase();\n  return text && keywords.some(word => text.includes(word.toLowerCase()));\n};\n\nconst items = $input.first()?.json?.data?.items || [];\n\nconst filtered = items.filter(item => {\n  const fields = item.fields || {};\n  return matchesKeyword(fields.title) || matchesKeyword(fields.content);\n});\n\nreturn filtered.map(item => ({\n  json: {\n    ...(item.fields || {}),\n    record_id: item.record_id || '',\n  },\n}));\n"
+      },
+      "id": "7dce7e7f-8e23-4674-879a-ae3c2d9d4a2a",
+      "name": "Extract Records",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        992,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const sourceItems = $items('Prepare LLM Payload', 0, $runIndex) || [];\n\nconst toStringSafe = (value) => {\n  if (typeof value === 'string') return value.trim();\n  if (typeof value === 'number' || typeof value === 'boolean') return String(value);\n  return '';\n};\n\nconst toArraySafe = (value) => {\n  if (Array.isArray(value)) return value;\n  if (typeof value === 'string') {\n    return value\n      .split(/\\n|,|，|;|；/)\n      .map(v => v.trim())\n      .filter(Boolean);\n  }\n  return [];\n};\n\nconst toNumberedList = (entries) => {\n  const arr = toArraySafe(entries);\n  if (!arr.length) return '';\n  return arr.map((entry, idx) => `${idx + 1}. ${entry}`).join('\\n');\n};\n\nconst toParagraphs = (entries) => {\n  const arr = toArraySafe(entries);\n  if (!arr.length) return '';\n  return arr\n    .map((entry, idx) => `**文案 ${idx + 1}：**\\n${entry}`)\n    .join('\\n\\n');\n};\n\nreturn items.map((item, index) => {\n  let parsed = {};\n  try {\n    parsed = JSON.parse(item.json?.choices?.[0]?.message?.content || '{}');\n  } catch {\n    parsed = {};\n  }\n\n  const source = sourceItems[index]?.json || {};\n  const recordId = source.record_id || '';\n\n  const hotspot = toNumberedList(parsed.hotspot_trend);\n  const reason = toNumberedList(parsed.viral_reason);\n  const topics = toNumberedList(parsed.topic_ideas);\n  const copywriting = toParagraphs(parsed.copywriting_with_tags);\n  const relevanceRaw = Number(parsed.relevance_score);\n  const relevance = Number.isFinite(relevanceRaw) ? relevanceRaw : 0;\n\n  const fields = {};\n  if (hotspot) fields['热点趋势'] = hotspot;\n  if (reason) fields['爆火原因'] = reason;\n  if (topics) fields['选题建议'] = topics;\n  if (copywriting) fields['文案建议（含推荐标签）'] = copywriting;\n  if (Number.isFinite(relevance)) fields['相关性'] = relevance;\n\n  const subredditLabel = toStringSafe(source.subreddit)\n    ? `r/${toStringSafe(source.subreddit)}`\n    : '无标题';\n  const title = toStringSafe(source.title) || subredditLabel;\n\n  const link = toStringSafe(source.permalink)\n    ? (source.permalink.startsWith('http')\n        ? source.permalink\n        : `https://reddit.com${source.permalink}`)\n    : toStringSafe(source.url);\n\n  return {\n    json: {\n      record_id: recordId,\n      fields,\n      message: {\n        title,\n        link,\n        hotspot,\n        reason,\n        topics,\n        copywriting,\n        relevance,\n      },\n    },\n  };\n});\n"
+      },
+      "id": "8188bdb0-a342-4a21-a89d-3f2f82f21364",
+      "name": "Parse Insights",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1776,
+        192
+      ],
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  json: {\n    view_id: 'vewbLDXZ8j',\n    page_size: 500,\n    field_names: ['title', 'content', 'subreddit', 'permalink', 'score'],\n  },\n}];\n\n"
+      },
+      "id": "047a9b60-c318-40d9-8cb6-e158f0f4b331",
+      "name": "Build Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        608,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://open.feishu.cn/open-apis/bitable/v1/apps/{{$items(\"Config\")[0].json.FEISHU_BITABLE_APP_TOKEN}}/tables/{{$items(\"Config\")[0].json.FEISHU_BITABLE_TABLE_ID}}/records/search",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$node[\"Get Feishu Token\"].json.tenant_access_token}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json}}",
+        "options": {}
+      },
+      "id": "42214e0c-b620-4e71-9a29-f6bb858031a1",
+      "name": "Fetch Selected Posts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        800,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 10,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1200,
+        80
+      ],
+      "id": "d7c6e1b0-7d22-49a8-9baa-2414747e1b34",
+      "name": "Split In Batches"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.DEEPSEEK_BASE_URL || \"https://api.deepseek.com/v1/chat/completions\" }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "deepSeekApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.payload }}",
+        "options": {}
+      },
+      "id": "923ac1f7-ac00-46a5-9c07-adf997fd73c3",
+      "name": "DeepSeek Rewrite",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1584,
+        192
+      ],
+      "credentials": {
+        "deepSeekApi": {
+          "id": "wg6afv25Jynu31kb",
+          "name": "DeepSeek account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $items('Config')[0]?.json ?? {};\nconst posts = items;   // Split In Batches 当前批次的所有条目\n\nconst toText = (value) => {\n  if (value === undefined || value === null) return '';\n  if (typeof value === 'string') return value;\n  if (typeof value === 'number' || typeof value === 'boolean') return String(value);\n  if (Array.isArray(value)) return value.map(toText).join(' ');\n  if (typeof value === 'object') return Object.values(value).map(toText).join(' ');\n  return '';\n};\n\nreturn posts.map(item => {\n  const post = item.json || {};\n\n  const permalinkRaw = toText(post.permalink);\n  const urlRaw = toText(post.url);\n  let resolvedLink = '';\n\n  if (urlRaw && urlRaw.startsWith('http')) {\n  resolvedLink = urlRaw;\n  } else if (permalinkRaw) {\n    resolvedLink = permalinkRaw.startsWith('http')\n      ? permalinkRaw\n      : `https://reddit.com${permalinkRaw}`;\n  }\n\n\n  const userPrompt = [\n    `Subreddit: r/${toText(post.subreddit)}`,\n    `标题: ${toText(post.title).trim()}`,\n    `正文: ${toText(post.content).trim()}`,\n    `得分: ${toText(post.score, '0')}`,\n    `链接: ${resolvedLink}`,\n  ].join('\\n');\n\n  return {\n    json: {\n      record_id: post.record_id || '',\n      title: toText(post.title),\n      subreddit: toText(post.subreddit),\n      permalink: permalinkRaw,\n      url: resolvedLink,\n      payload: {\n        model: cfg.DEEPSEEK_MODEL || 'deepseek-chat',\n        temperature: 0.6,\n        response_format: { type: 'json_object' },\n        messages: [\n          {\n            role: 'system',\n            content: `你是小红书账号“n8n自动化实操干货”的内容策划。账号定位：分享 n8n 自动化工作流实操技巧，目标是提升账号涨粉与互动热度，但必须遵守小红书平台规范：不要出现任何诱导关注、互粉、互关、点赞、收藏等字眼，可以通过“欢迎留言交流”“一起探讨”等自然互动语气鼓励互动。\n\n根据输入的 Reddit 帖子内容，输出一个 JSON，仅包含以下字段：\n- hotspot_trend（字符串，30~60 字）：概括帖子反映的用户痛点或趋势。\n- viral_reason（字符串，40~70 字）：说明这类内容为何能引发讨论。\n- topic_ideas（数组，长度 3）：每项 11~16 字的小红书标题，突出痛点/收益。\n- copywriting_with_tags（数组，长度 3）：每项 80~110 字中文文案，结构包含“引子 → n8n 自动化解决方案亮点 → 互动式结尾（鼓励评论/分享等）”。每段结尾追加标签串，至少包含 #n8n自动化 和 #工作流，再补 2~3 个契合话题的标签。\n- relevance_score（数值 0~10）：该帖子内容与“n8n 自动化工作流实操干货”主题的相关性，10 为高度相关，0 为完全无关。\n若无法生成某字段，请给空字符串、空数组或 0。除 JSON 外不要输出任何文字。`\n          },\n          { role: 'user', content: userPrompt },\n        ],\n      },\n    },\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1392,
+        192
+      ],
+      "id": "340ef27e-c3a8-49ed-8a15-73d5717f3418",
+      "name": "Prepare LLM Payload"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://open.feishu.cn/open-apis/bitable/v1/apps/{{$items(\"Config\")[0].json.FEISHU_BITABLE_APP_TOKEN}}/tables/{{$items(\"Config\")[0].json.FEISHU_BITABLE_TABLE_ID}}/records/batch_update",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$items(\"Get Feishu Token\")[0].json.tenant_access_token}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n      records: $input.all().map(item => ({\n        record_id: item.json.record_id,\n        fields: item.json.fields,\n      })),\n    } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1968,
+        192
+      ],
+      "id": "ba85bcf0-8823-4277-9e6d-e67582b2da7d",
+      "name": "Write To Reddit Table"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "4e518ae0-c8fb-4b45-8791-7370c3f5818d",
+              "leftValue": "={{ $json.message.relevance }}",
+              "rightValue": 8,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1952,
+        448
+      ],
+      "id": "5a967743-850d-4115-8408-dcfc0f1c0937",
+      "name": "Filter High Relevance"
+    },
+    {
+      "parameters": {
+        "jsCode": "const posts = items\n  .map(item => item.json?.message)\n  .filter(message => message && message.relevance >= 8);\n\nif (!posts.length) return [];\n\nconst elements = posts.map((post, idx) => ({\n  tag: 'markdown',\n  content: [\n    `**${idx + 1}. ${post.title || '无标题'} — 相关性 ${post.relevance}/10**`,\n    post.link ? `[查看原帖](${post.link})` : '',\n    post.hotspot ? `> 热点趋势\\n${post.hotspot}` : '',\n    post.reason ? `> 爆火原因\\n${post.reason}` : '',\n    post.topics ? `> 选题建议\\n${post.topics}` : '',\n    post.copywriting ? `> 文案建议\\n${post.copywriting}` : '',\n  ].filter(Boolean).join('\\n\\n'),\n}));\n\nreturn [{\n  json: {\n    msg_type: 'interactive',\n    card: {\n      config: { wide_screen_mode: true },\n      header: {\n        template: 'turquoise',\n        title: { tag: 'plain_text', content: '高相关 Reddit 热点洞察' },\n      },\n      elements,\n    },\n  },\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2224,
+        432
+      ],
+      "id": "0b84a208-bdaa-46c0-bc2a-b7c29fb9ddd0",
+      "name": "Build Feishu Card"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $items(\"Config\")[0].json.FEISHU_WEBHOOK_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { msg_type: $json.msg_type, card: $json.card } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2432,
+        432
+      ],
+      "id": "138c226c-f9b9-48b4-868a-637f80e4e931",
+      "name": "Send Feishu Webhook"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Get Feishu Token": {
+      "main": [
+        [
+          {
+            "node": "Build Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Query": {
+      "main": [
+        [
+          {
+            "node": "Fetch Selected Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Get Feishu Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking 'Test workflow'": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily 24h": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Records": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Insights": {
+      "main": [
+        [
+          {
+            "node": "Write To Reddit Table",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Filter High Relevance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Selected Posts": {
+      "main": [
+        [
+          {
+            "node": "Extract Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split In Batches": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Prepare LLM Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeepSeek Rewrite": {
+      "main": [
+        [
+          {
+            "node": "Parse Insights",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare LLM Payload": {
+      "main": [
+        [
+          {
+            "node": "DeepSeek Rewrite",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write To Reddit Table": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter High Relevance": {
+      "main": [
+        [
+          {
+            "node": "Build Feishu Card",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Feishu Card": {
+      "main": [
+        [
+          {
+            "node": "Send Feishu Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "89194332-1a0c-416a-8335-efbd9b5b8bd3",
+  "meta": {
+    "instanceId": "d6e264425c95309c6cb7a1b5b39423ac57593612895e6024faca12cbaca2335b"
+  },
+  "id": "JtMMCaVEJWHDRohO",
+  "tags": []
+}

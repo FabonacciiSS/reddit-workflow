@@ -1,0 +1,649 @@
+{
+  "name": "Reddit Hotposts to Feishu Bitable (Batch)v3",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "cbb4e8ab-9baf-4ebd-ba9e-4e21b32747c6",
+      "name": "When clicking 'Test workflow'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        176,
+        -128
+      ]
+    },
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 24
+            }
+          ]
+        }
+      },
+      "id": "9b53e6d7-9959-4775-8e91-4c5fe6072576",
+      "name": "Every 6 hours",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        176,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "41665b50-ee1d-492a-9bed-c11d5c8b699c",
+              "name": "KEYWORD_LIST",
+              "value": "[]",
+              "type": "array"
+            },
+            {
+              "id": "subreddits",
+              "name": "SUBREDDIT_LIST",
+              "value": "=[\"n8n\"]",
+              "type": "json"
+            },
+            {
+              "id": "limit",
+              "name": "LIMIT_PER_SUB",
+              "value": "={{ $env.LIMIT_PER_SUB || 100 }}",
+              "type": "number"
+            },
+            {
+              "id": "threshold",
+              "name": "SCORE_THRESHOLD",
+              "value": "={{ $env.SCORE_THRESHOLD || 100 }}",
+              "type": "number"
+            },
+            {
+              "id": "ua",
+              "name": "REDDIT_USER_AGENT",
+              "value": "={{ $env.REDDIT_USER_AGENT || 'hotpost-n8n/0.1 (by u/yourname)' }}",
+              "type": "string"
+            },
+            {
+              "id": "bitable_app_token",
+              "name": "FEISHU_BITABLE_APP_TOKEN",
+              "value": "={{ $env.FEISHU_BITABLE_REDDIT_APP_TOKEN }}",
+              "type": "string"
+            },
+            {
+              "id": "bitable_table_id",
+              "name": "FEISHU_BITABLE_TABLE_ID",
+              "value": "={{ $env.FEISHU_BITABLE_REDDIT_TABLE_ID }}",
+              "type": "string"
+            },
+            {
+              "id": "feishu_app_id",
+              "name": "FEISHU_APP_ID",
+              "value": "={{ $env.FEISHU_APP_ID }}",
+              "type": "string"
+            },
+            {
+              "id": "feishu_app_secret",
+              "name": "FEISHU_APP_SECRET",
+              "value": "={{ $env.FEISHU_APP_SECRET }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d693fce4-4942-4474-8a6d-5f990f1a2b9b",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        400,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Robustly split subreddit list from Config input item\nconst cfg = $json || {};\nlet list = cfg.SUBREDDIT_LIST;\nif (typeof list === 'string') {\n  let parsed = [];\n  try { parsed = JSON.parse(list); } catch (e) {\n    parsed = list.split(',').map(s => s.trim()).filter(Boolean);\n  }\n  list = parsed;\n}\nif (!Array.isArray(list)) list = [];\nconst limit = Number(cfg.LIMIT_PER_SUB) || 30;\nconst threshold = Number(cfg.SCORE_THRESHOLD) || 50;\nconst ua = String(cfg.REDDIT_USER_AGENT || 'hotpost-n8n/0.1 (by u/yourname)');\nreturn list.map(s => ({ json: { subreddit: s, LIMIT_PER_SUB: limit, SCORE_THRESHOLD: threshold, REDDIT_USER_AGENT: ua } }));"
+      },
+      "id": "9b6a4578-9a35-4f5c-b91d-8ad516999332",
+      "name": "Split Subreddits",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "subreddit": "={{$json.subreddit}}",
+        "limit": "={{ $json.LIMIT_PER_SUB }}",
+        "filters": {}
+      },
+      "id": "78d41b48-2f79-4a92-9489-928330787391",
+      "name": "Get many posts",
+      "type": "n8n-nodes-base.reddit",
+      "typeVersion": 1,
+      "position": [
+        912,
+        -48
+      ],
+      "credentials": {
+        "redditOAuth2Api": {
+          "id": "0Edyv1FA3HAK0JKm",
+          "name": "Reddit account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const threshold = $node['Config'].json.SCORE_THRESHOLD || 0;\nreturn items\n  .filter(i => !i.json.over_18 && !i.json.stickied && (i.json.score||0) >= threshold)\n  .map(i => i);"
+      },
+      "id": "9aa62fc2-0cd2-4eec-93b1-70637ca3c194",
+      "name": "Filter NSFW/Stickied/Score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const seen = new Set();\nconst nowTs = Date.now();\nconst out = [];\nfor (const item of items) {\n  const d = item.json;\n  const id = d.id;\n  if (!id || seen.has(id)) continue;\n  seen.add(id);\n  const createdUtcMs = Number.isFinite(Number(d.created_utc)) ? Math.floor(Number(d.created_utc) * 1000) : 0;\n  out.push({\n    json: {\n      subreddit: d.subreddit || '',\n      post_id: d.id,\n      title: d.title || '',\n      author: d.author || '',\n      content: d.selftext || '',\n      score: Number(d.score) || 0,\n      num_comments: Number(d.num_comments) || 0,\n      created_utc: createdUtcMs,\n      permalink: 'https://reddit.com' + (d.permalink || ''),\n      url: d.url || '',\n      thumbnail: d.thumbnail || '',\n      over_18: String(Boolean(d.over_18)),\n      stickied: String(Boolean(d.stickied)),\n      created_at: nowTs,\n    },\n  });\n}\nreturn out;"
+      },
+      "id": "af172d73-303e-4aad-a565-1e97aec0a7ef",
+      "name": "Transform Fields",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1328,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ ({ app_id: $items(\"Config\")[0].json.FEISHU_APP_ID, app_secret: $items(\"Config\")[0].json.FEISHU_APP_SECRET }) }}",
+        "options": {}
+      },
+      "id": "7f710a33-23e4-48eb-aea5-667faecc53ba",
+      "name": "Get Feishu Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1104,
+        -272
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "c292533a-d3d9-4e63-a6be-700b41ba6601",
+      "name": "Split In Batches (10)",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 1,
+      "position": [
+        1728,
+        -48
+      ],
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://open.feishu.cn/open-apis/bitable/v1/apps/{{$items(\"Config\")[0].json.FEISHU_BITABLE_APP_TOKEN}}/tables/{{$items(\"Config\")[0].json.FEISHU_BITABLE_TABLE_ID}}/records",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$json._tenant_access_token}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "body": "={{ JSON.stringify({ fields: $json.fields }) }}\n",
+        "options": {}
+      },
+      "id": "956f3cd3-f58d-463d-9eda-e743c44e8348",
+      "name": "Write Batch to Bitable",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2704,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Continue batching until no items left\nif ($node['Split In Batches (10)'].context?.noItemsLeft) { return [{ json: { done: true } }]; }\nreturn [{ json: { next: true } }];"
+      },
+      "id": "c0bff35d-9e44-48f6-bdbb-2568aaa0b333",
+      "name": "Loop Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const tokenItems = $items('Get Feishu Token');\nlet token = '';\nif (Array.isArray(tokenItems) && tokenItems.length > 0) {\n  const first = tokenItems[0];\n  if (first && first.json && typeof first.json.tenant_access_token === 'string') {\n    token = first.json.tenant_access_token;\n  }\n}\nif (!token) {\n  throw new Error('Missing Feishu tenant_access_token');\n}\n\nconst config = $items('Config')[0].json || {};\nconst allowedKeys = [\n  'subreddit','post_id','title','author','content','score','num_comments',\n  'created_utc','permalink','url','thumbnail','over_18','stickied','created_at'\n];\n\nreturn items.map(item => {\n  const fields = {};\n  for (const key of allowedKeys) {\n    if (Object.prototype.hasOwnProperty.call(item.json, key)) {\n      fields[key] = item.json[key];\n    }\n  }\n  return {\n    json: {\n      ...fields,\n      _tenant_access_token: token,\n      _app_token: config.FEISHU_BITABLE_REDDIT_APP_TOKEN || config.FEISHU_BITABLE_APP_TOKEN || '',\n      _table_id: config.FEISHU_BITABLE_TABLE_ID || config.FEISHU_TABLE_ID || ''\n    }\n  };\n});\n"
+      },
+      "id": "da86d1f8-6cb2-4e43-9000-db956ba1e706",
+      "name": "Attach Feishu Token",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1904,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const seen = new Set();\nconst out = [];\n\nfor (const item of items) {\n  const id = item.json.post_id;\n  if (!id) continue;\n  if (seen.has(id)) continue;\n  seen.add(id);\n  out.push(item);\n}\n\nreturn out;\n"
+      },
+      "id": "88683b40-2d69-45d9-921f-128b436c2bf4",
+      "name": "Deduplicate by post_id",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1536,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = [];\n\nfor (const item of items) {\n  const token = item.json._tenant_access_token;\n  const appToken = item.json._app_token;\n  const tableId = item.json._table_id;\n  const postId = item.json.post_id;\n\n  if (!token || !appToken || !tableId || !postId) {\n    item.json._exists = false;\n    output.push(item);\n    continue;\n  }\n\n  const response = await this.helpers.httpRequest({\n    method: 'POST',\n    url: `https://open.feishu.cn/open-apis/bitable/v1/apps/${appToken}/tables/${tableId}/records/search`,\n    headers: {\n      Authorization: `Bearer ${token}`,\n      'Content-Type': 'application/json',\n    },\n    body: {\n      filter: {\n        conjunction: 'and',\n        conditions: [\n          { field_name: 'post_id', operator: 'is', value: [postId] },\n        ],\n      },\n      page_size: 1,\n    },\n    json: true,\n  });\n\n  const total = response?.data?.total ?? 0;\n  item.json._exists = total > 0;\n  output.push(item);\n}\n\nreturn output;\n"
+      },
+      "id": "1485decc-8e60-4618-a47c-22d6d78b6cf0",
+      "name": "Check Existing in Feishu",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2080,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "9cd490a2-daff-4af2-b645-9ab00f95dad0",
+              "leftValue": "={{ $json._exists }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "3acad00c-5c50-4c25-9e32-b8cbc0245fe8",
+      "name": "Is New Post?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2304,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const SKIP_KEYS = new Set([\n  '_tenant_access_token',\n  '_app_token',\n  '_table_id',\n  '_exists',\n]);\n\nreturn items\n  .map(item => {\n    const {\n      _tenant_access_token,\n      _app_token,\n      _table_id,\n      _exists,\n      ...rest\n    } = item.json ?? {};\n\n    const filteredFields = Object.fromEntries(\n      Object.entries(rest).filter(([key, value]) => {\n        if (SKIP_KEYS.has(key)) return false;\n        return value !== undefined && value !== null;\n      }),\n    );\n\n    if (!Object.keys(filteredFields).length) {\n      return null; // 没有字段就跳过\n    }\n\n    return {\n      json: {\n        _tenant_access_token,\n        _app_token,\n        _table_id,\n        fields: filteredFields,\n      },\n    };\n  })\n  .filter(Boolean);\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2512,
+        -144
+      ],
+      "id": "b228d1fc-8351-4d2d-b957-637128c33aae",
+      "name": "Prepare Payload"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "99b3d527-33cd-463e-8d62-d7394a4d1135",
+              "leftValue": "KEY_WORD_LIST",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notExists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        560,
+        -48
+      ],
+      "id": "c0ee9b93-01dd-4bc6-8962-6da17156641a",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "location": "allReddit",
+        "keyword": "={{ $json.keyword }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.reddit",
+      "typeVersion": 1,
+      "position": [
+        912,
+        128
+      ],
+      "id": "927d76bc-b7a4-437e-8e64-02bf355bb72b",
+      "name": "Search for a post",
+      "credentials": {
+        "redditOAuth2Api": {
+          "id": "0Edyv1FA3HAK0JKm",
+          "name": "Reddit account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const keywords = Array.isArray(items[0].json.KEYWORD_LIST)\n  ? items[0].json.KEYWORD_LIST\n  : [];\n\nconst limit = items[0].json.LIMIT_PER_KEYWORD ?? items[0].json.LIMIT_PER_SUB ?? 30;\nconst threshold = items[0].json.SCORE_THRESHOLD ?? 0;\nconst userAgent = items[0].json.REDDIT_USER_AGENT ?? '';\n\nreturn keywords\n  .map(kw => (typeof kw === 'string' ? kw.trim() : ''))\n  .filter(Boolean)\n  .map(keyword => ({\n    json: {\n      keyword,\n      limit,\n      score_threshold: threshold,\n      reddit_user_agent: userAgent,\n    },\n  }));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        128
+      ],
+      "id": "f2ad6c67-41a1-4a7d-948c-dca597e9a5e9",
+      "name": "Split Keywords"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Get Feishu Token",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is New Post?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Payload",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Split In Batches (10)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking 'Test workflow'": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every 6 hours": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Subreddits": {
+      "main": [
+        [
+          {
+            "node": "Get many posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many posts": {
+      "main": [
+        [
+          {
+            "node": "Filter NSFW/Stickied/Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter NSFW/Stickied/Score": {
+      "main": [
+        [
+          {
+            "node": "Transform Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform Fields": {
+      "main": [
+        [
+          {
+            "node": "Deduplicate by post_id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Existing in Feishu": {
+      "main": [
+        [
+          {
+            "node": "Is New Post?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deduplicate by post_id": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches (10)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attach Feishu Token": {
+      "main": [
+        [
+          {
+            "node": "Check Existing in Feishu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Feishu Token": {
+      "main": [
+        [
+          {
+            "node": "Attach Feishu Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split In Batches (10)": {
+      "main": [
+        [
+          {
+            "node": "Attach Feishu Token",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Loop Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Batch to Bitable": {
+      "main": [
+        []
+      ]
+    },
+    "Loop Check": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches (10)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Payload": {
+      "main": [
+        [
+          {
+            "node": "Write Batch to Bitable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Split Keywords",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Split Subreddits",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Keywords": {
+      "main": [
+        [
+          {
+            "node": "Search for a post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search for a post": {
+      "main": [
+        [
+          {
+            "node": "Filter NSFW/Stickied/Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "2909e7f4-1e8e-4052-a87d-6ff15791b526",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d6e264425c95309c6cb7a1b5b39423ac57593612895e6024faca12cbaca2335b"
+  },
+  "id": "GnEEWhk9z05mJJfb",
+  "tags": []
+}

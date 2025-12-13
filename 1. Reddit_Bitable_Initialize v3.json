@@ -1,0 +1,225 @@
+﻿{
+    "name":  "Reddit Initialize Feishu Bitable Fields (Run Once)",
+    "nodes":  [
+                  {
+                      "parameters":  {
+
+                                     },
+                      "id":  "manual-trigger",
+                      "name":  "When clicking \u0027Test workflow\u0027",
+                      "type":  "n8n-nodes-base.manualTrigger",
+                      "typeVersion":  1,
+                      "position":  [
+                                       200,
+                                       380
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "assignments":  {
+                                                             "assignments":  [
+                                                                                 {
+                                                                                     "id":  "feishu_app_id",
+                                                                                     "name":  "FEISHU_APP_ID",
+                                                                                     "value":  "={{ $env.FEISHU_APP_ID }}",
+                                                                                     "type":  "string"
+                                                                                 },
+                                                                                 {
+                                                                                     "id":  "feishu_app_secret",
+                                                                                     "name":  "FEISHU_APP_SECRET",
+                                                                                     "value":  "={{ $env.FEISHU_APP_SECRET }}",
+                                                                                     "type":  "string"
+                                                                                 },
+                                                                                 {
+                                                                                     "id":  "bitable_app_token",
+                                                                                     "name":  "FEISHU_BITABLE_APP_TOKEN",
+                                                                                     "value":  "={{ $env.FEISHU_BITABLE_REDDIT_APP_TOKEN }}",
+                                                                                     "type":  "string"
+                                                                                 },
+                                                                                 {
+                                                                                     "id":  "bitable_table_id",
+                                                                                     "name":  "FEISHU_BITABLE_TABLE_ID",
+                                                                                     "value":  "={{ $env.FEISHU_BITABLE_REDDIT_APP_ID }}",
+                                                                                     "type":  "string"
+                                                                                 }
+                                                                             ]
+                                                         },
+                                         "options":  {
+                                                         "keepOnlySet":  false
+                                                     }
+                                     },
+                      "id":  "configuration",
+                      "name":  "Configuration",
+                      "type":  "n8n-nodes-base.set",
+                      "typeVersion":  3.4,
+                      "position":  [
+                                       420,
+                                       380
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "method":  "POST",
+                                         "url":  "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
+                                         "sendHeaders":  true,
+                                         "headerParameters":  {
+                                                                  "parameters":  [
+                                                                                     {
+                                                                                         "name":  "Content-Type",
+                                                                                         "value":  "application/json"
+                                                                                     }
+                                                                                 ]
+                                                              },
+                                         "sendBody":  true,
+                                         "specifyBody":  "json",
+                                         "jsonBody":  "={{ ({ app_id: $node[\u0027Configuration\u0027].json.FEISHU_APP_ID, app_secret: $node[\u0027Configuration\u0027].json.FEISHU_APP_SECRET }) }}",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "get-feishu-token",
+                      "name":  "Get Feishu Token",
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.2,
+                      "position":  [
+                                       640,
+                                       380
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const fields = [\n  // Use safe types: Text(1), Number(2), DateTime(5)\n  { field_name: \u0027subreddit\u0027, type: 1 },\n  { field_name: \u0027post_id\u0027, type: 1 },\n  { field_name: \u0027title\u0027, type: 1 },\n  { field_name: \u0027author\u0027, type: 1 },\n  { field_name: \u0027content\u0027, type: 1 },\n  { field_name: \u0027score\u0027, type: 2 },\n  { field_name: \u0027num_comments\u0027, type: 2 },\n  { field_name: \u0027created_utc\u0027, type: 5 },\n  { field_name: \u0027permalink\u0027, type: 1 },\n  { field_name: \u0027url\u0027, type: 1 },\n  { field_name: \u0027thumbnail\u0027, type: 1 },\n  { field_name: \u0027over_18\u0027, type: 1 },\n  { field_name: \u0027stickied\u0027, type: 1 },\n  { field_name: \u0027created_at\u0027, type: 5 },\n  // LLM enrichment outputs\n  { field_name: \u0027\\u70ed\\u70b9\\u8d8b\\u52bf\u0027, type: 1 },\n  { field_name: \u0027\\u7206\\u706b\\u539f\\u56e0\u0027, type: 1 },\n  { field_name: \u0027\\u9009\\u9898\\u5efa\\u8bae\u0027, type: 1 },\n  { field_name: \u0027\\u6587\\u6848\\u5efa\\u8bae\\uff08\\u542b\\u63a8\\u8350\\u6807\\u7b7e\\uff09\u0027, type: 1 },\n  { field_name: \u0027\\u76f8\\u5173\\u6027\u0027, type: 2 },\n];\nconst appToken = $node[\u0027Configuration\u0027].json.FEISHU_BITABLE_APP_TOKEN;\nconst tableId = $node[\u0027Configuration\u0027].json.FEISHU_BITABLE_TABLE_ID;\nconst tenantToken = $node[\u0027Get Feishu Token\u0027].json.tenant_access_token;\nreturn fields.map(f =\u003e ({ json: { ...f, _appToken: appToken, _tableId: tableId, _tenant: tenantToken } }));"
+                                     },
+                      "id":  "prepare-fields",
+                      "name":  "Prepare Field List",
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       860,
+                                       380
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "method":  "POST",
+                                         "url":  "=https://open.feishu.cn/open-apis/bitable/v1/apps/{{ $json._appToken }}/tables/{{ $json._tableId }}/fields",
+                                         "sendHeaders":  true,
+                                         "headerParameters":  {
+                                                                  "parameters":  [
+                                                                                     {
+                                                                                         "name":  "Authorization",
+                                                                                         "value":  "=Bearer {{ $json._tenant }}"
+                                                                                     },
+                                                                                     {
+                                                                                         "name":  "Content-Type",
+                                                                                         "value":  "application/json"
+                                                                                     }
+                                                                                 ]
+                                                              },
+                                         "sendBody":  true,
+                                         "specifyBody":  "json",
+                                         "jsonBody":  "={{ ({ field_name: $json.field_name, type: $json.type }) }}",
+                                         "options":  {
+                                                         "batching":  {
+                                                                          "batch":  {
+                                                                                        "batchSize":  1,
+                                                                                        "batchInterval":  600
+                                                                                    }
+                                                                      }
+                                                     }
+                                     },
+                      "id":  "create-field",
+                      "name":  "Create Field",
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.2,
+                      "position":  [
+                                       1080,
+                                       380
+                                   ],
+                      "continueOnFail":  true
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const items = $input.all();\nlet created=0, skipped=0, failed=0;\nconst details=[];\nfor (const it of items){\n  const res = it.json || {};\n  const name = it.binary?.field_name || it.json?.field_name || \u0027unknown\u0027;\n  if (res.code === 0){ created++; details.push({field:name, status:\u0027created\u0027}); }\n  else if (res.code === 1254044 || res.msg?.includes(\u0027already exists\u0027)){ skipped++; details.push({field:name, status:\u0027exists\u0027}); }\n  else { failed++; details.push({field:name, status:\u0027failed\u0027, code:res.code, msg:res.msg}); }\n}\nreturn [{ json: { success: failed===0, created, skipped, failed, details } }];"
+                                     },
+                      "id":  "summarize",
+                      "name":  "Summarize",
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       1300,
+                                       380
+                                   ]
+                  }
+              ],
+    "connections":  {
+                        "When clicking \u0027Test workflow\u0027":  {
+                                                                        "main":  [
+                                                                                     [
+                                                                                         {
+                                                                                             "node":  "Configuration",
+                                                                                             "type":  "main",
+                                                                                             "index":  0
+                                                                                         }
+                                                                                     ]
+                                                                                 ]
+                                                                    },
+                        "Configuration":  {
+                                              "main":  [
+                                                           [
+                                                               {
+                                                                   "node":  "Get Feishu Token",
+                                                                   "type":  "main",
+                                                                   "index":  0
+                                                               }
+                                                           ]
+                                                       ]
+                                          },
+                        "Get Feishu Token":  {
+                                                 "main":  [
+                                                              [
+                                                                  {
+                                                                      "node":  "Prepare Field List",
+                                                                      "type":  "main",
+                                                                      "index":  0
+                                                                  }
+                                                              ]
+                                                          ]
+                                             },
+                        "Prepare Field List":  {
+                                                   "main":  [
+                                                                [
+                                                                    {
+                                                                        "node":  "Create Field",
+                                                                        "type":  "main",
+                                                                        "index":  0
+                                                                    }
+                                                                ]
+                                                            ]
+                                               },
+                        "Create Field":  {
+                                             "main":  [
+                                                          [
+                                                              {
+                                                                  "node":  "Summarize",
+                                                                  "type":  "main",
+                                                                  "index":  0
+                                                              }
+                                                          ]
+                                                      ]
+                                         }
+                    },
+    "pinData":  {
+
+                },
+    "settings":  {
+                     "executionOrder":  "v1"
+                 },
+    "staticData":  null,
+    "tags":  [
+
+             ],
+    "triggerCount":  0,
+    "updatedAt":  "2025-10-27T00:00:00.000Z",
+    "versionId":  "1.0"
+}
