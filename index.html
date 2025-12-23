@@ -1,0 +1,261 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reddit Workflow</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Fraunces:opsz,wght@9..144,600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f2f5f9;
+      --ink: #141821;
+      --accent: #ff5c35;
+      --accent-2: #1b3a57;
+      --card: #ffffff;
+      --muted: #5f6b7a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 24px;
+      font-family: "Space Grotesk", "Noto Sans", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(700px 320px at 12% -10%, #ffe0d3 0%, transparent 60%),
+        radial-gradient(500px 320px at 85% 8%, #cfe3ff 0%, transparent 55%),
+        linear-gradient(180deg, #f8fafc 0%, #f2f5f9 100%);
+    }
+    .wrap {
+      max-width: 980px;
+      margin: 0 auto;
+    }
+    .hero {
+      background: var(--card);
+      border-radius: 18px;
+      padding: 36px;
+      box-shadow: 0 14px 30px rgba(0,0,0,0.12);
+      position: relative;
+      overflow: hidden;
+    }
+    .hero:after {
+      content: "";
+      position: absolute;
+      right: -60px;
+      top: -60px;
+      width: 180px;
+      height: 180px;
+      background: conic-gradient(from 120deg, #ff5c35, #ffd166, #06d6a0, #ff5c35);
+      border-radius: 50%;
+      opacity: 0.15;
+    }
+    h1 {
+      font-family: "Fraunces", serif;
+      font-size: 36px;
+      margin: 0 0 10px 0;
+    }
+    .subtitle {
+      color: var(--muted);
+      font-size: 17px;
+      line-height: 1.6;
+      margin: 0 0 18px 0;
+    }
+    .pill {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: #fff0e7;
+      color: #c24a26;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 18px;
+      margin-top: 24px;
+    }
+    .card {
+      background: var(--card);
+      border-radius: 14px;
+      padding: 18px;
+      border: 1px solid #e7edf4;
+    }
+    .card h3 {
+      margin: 0 0 8px 0;
+      font-size: 18px;
+    }
+    .card p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 14px;
+    }
+    .cta {
+      margin-top: 22px;
+      display: inline-block;
+      padding: 12px 20px;
+      border-radius: 10px;
+      text-decoration: none;
+      color: #fff;
+      background: var(--accent-2);
+      font-weight: 600;
+    }
+    .cta:hover { background: #132a40; }
+    .section {
+      margin-top: 26px;
+      background: var(--card);
+      border-radius: 14px;
+      padding: 20px;
+      border: 1px solid #e7edf4;
+    }
+    .list {
+      margin: 10px 0 0 0;
+      padding: 0 0 0 18px;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+    .email-form {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .email-form input,
+    .email-form select {
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid #e3d9c9;
+      font-size: 14px;
+      background: #fff;
+    }
+    .email-form button {
+      padding: 12px 16px;
+      border-radius: 10px;
+      border: none;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .email-form button:hover { opacity: 0.9; }
+    .share-block {
+      margin-top: 18px;
+      text-align: center;
+      padding: 18px;
+      background: #f7fbff;
+      border-radius: 12px;
+      border: 1px solid #e4f1ff;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <span class="pill">n8n Workflow</span>
+      <h1>Reddit Hotpost Workflow</h1>
+      <p class="subtitle">
+        Track Reddit trends, summarize hot posts, and publish structured insights to Feishu Bitable.
+      </p>
+      <a class="cta" href="https://github.com/FabonacciiSS/reddit-workflow">View on GitHub</a>
+      <div class="grid">
+        <div class="card">
+          <h3>Source Discovery</h3>
+          <p>Pull hot posts from selected subreddits, keywords, and time windows.</p>
+        </div>
+        <div class="card">
+          <h3>LLM Rewrite</h3>
+          <p>Normalize titles, extract key points, and generate a brief editorial summary.</p>
+        </div>
+        <div class="card">
+          <h3>Feishu Bitable</h3>
+          <p>Store structured fields for later search, reporting, and reuse.</p>
+        </div>
+        <div class="card">
+          <h3>Automations</h3>
+          <p>Batch jobs, scheduling, and controlled retries for stable runs.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>Quick Start</h3>
+      <ol class="list">
+        <li>Import the workflow JSON files into n8n.</li>
+        <li>Fill in `env.example` and required credentials.</li>
+        <li>Run the initialization workflow to prepare Feishu tables.</li>
+      </ol>
+    </div>
+
+    <div class="section">
+      <h3>Email Subscribers</h3>
+      <p class="subtitle" style="margin-top: 8px;">
+        Submit your email and the workflow you want to follow. We store it in n8n via webhook.
+      </p>
+      <div class="email-form">
+        <input id="emailInput" type="email" placeholder="name@example.com" />
+        <select id="workflowSelect">
+          <option value="reddit-workflow">reddit-workflow</option>
+          <option value="market-insights-workflow">market-insights-workflow</option>
+          <option value="jobs-hunter-workflow">jobs-hunter-workflow</option>
+          <option value="ai-news-workflow">ai-news-workflow</option>
+        </select>
+        <button type="button" onclick="submitEmail()">Submit</button>
+      </div>
+      <p id="emailStatus" class="subtitle" style="margin-top: 10px;"></p>
+    </div>
+
+    <div class="share-block">
+      <h3>Share</h3>
+      <p>If this workflow helps you, feel free to share it.</p>
+      <div style="margin: 12px 0;">
+        <script src="https://tjs.sjs.sinajs.cn/open/api/js/wb.js" type="text/javascript" charset="utf-8"></script>
+        <wb:share-button appkey="2460736970" addition="number" type="button" ralateUid="5523009861" rnd="1348023484"></wb:share-button>
+      </div>
+      <div style="margin: 12px 0;">
+        <button class="cta" style="padding: 10px 18px;" onclick="copyShareText()">Copy Share Text</button>
+        <a class="cta" style="padding: 10px 18px;" href="https://www.xiaohongshu.com" target="_blank" rel="noopener">Open Xiaohongshu</a>
+      </div>
+      <div style="margin-top: 12px; color: #666;">
+        WeChat share: copy the text, or scan the QR code on desktop and forward in WeChat.
+      </div>
+      <div style="margin-top: 10px;">
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=https://github.com/FabonacciiSS/reddit-workflow" alt="WeChat QR" />
+      </div>
+    </div>
+  </div>
+  <script>
+    function submitEmail() {
+      const input = document.getElementById("emailInput");
+      const select = document.getElementById("workflowSelect");
+      const status = document.getElementById("emailStatus");
+      const email = (input && input.value || "").trim();
+      const workflow = select ? select.value : "reddit-workflow";
+      if (!email) {
+        status.textContent = "Please enter an email address.";
+        return;
+      }
+      status.textContent = "Submitting...";
+      fetch("https://n8n.build2solve.com/webhook/email-listening", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, WorkflowName: workflow })
+      }).then((res) => {
+        if (!res.ok) throw new Error("Request failed");
+        status.textContent = "Submitted. Thanks!";
+        input.value = "";
+      }).catch(() => {
+        status.textContent = "Submit failed. Please try again later.";
+      });
+    }
+    function copyShareText() {
+      const text = "Reddit Workflow: n8n pipeline for hotposts, summaries, and Feishu Bitable\nhttps://github.com/FabonacciiSS/reddit-workflow";
+      navigator.clipboard.writeText(text).then(() => {
+        alert("Share text copied.");
+      }).catch(() => {
+        alert("Copy failed, please copy manually.");
+      });
+    }
+  </script>
+</body>
+</html>
